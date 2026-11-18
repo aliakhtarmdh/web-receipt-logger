@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Receipt to Expense Log</title>
+<style>
+  :root{
+    --bg:#fdf6f9; --board:#f3e8f7; --card:#ffffff; --ink:#322639; --muted:#8a7a92;
+    --accent:#8b2fc9; --accent-dark:#5c1e86; --wood:#b87ae0; --wood-dark:#7a3ba8;
+    --green:#3d7a4f; --green-soft:#e4efe7; --danger:#a63d3d; --line:#eee0f2;
+    --radius:14px;
+  }
+  body.dark{
+    --bg:#150f1c; --board:#241a30; --card:#1c1425; --ink:#ece0f7; --muted:#a793bd;
+    --accent:#a855f7; --accent-dark:#4c1d7a; --wood:#8b5cf6; --wood-dark:#c4a5f5;
+    --green:#4e9c68; --green-soft:#22301f; --danger:#e07a7a; --line:#33253f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding-bottom:86px}
+  .wrap{max-width:760px;margin:0 auto;padding:20px 16px}
+  header{padding:22px 4px 10px}
+  header h1{font-size:1.55rem;letter-spacing:-.02em}
+  header p{color:var(--muted);font-size:.95rem;margin-top:2px}
+  section{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-top:18px;box-shadow:0 3px 10px rgba(58,50,38,.08)}
+  .sec-head{display:flex;align-items:baseline;gap:10px;margin-bottom:14px}
+  .sec-num{background:var(--board);border:2px solid var(--wood);color:var(--wood-dark);font-weight:800;font-size:.8rem;border-radius:10px;padding:3px 10px}
+  .sec-head h2{font-size:1.15rem}
+  .hint{color:var(--muted);font-size:.9rem;margin-bottom:14px}
+  .label{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px}
+
+  body.dark section{box-shadow:0 3px 14px rgba(139,92,246,.12)}
+  body.dark .board{border-color:var(--wood);box-shadow:0 0 16px rgba(139,92,246,.35), inset 0 0 20px rgba(139,92,246,.08)}
+  body.dark .sq.now .dot{box-shadow:0 0 0 4px rgba(168,85,247,.3), 0 0 14px rgba(168,85,247,.5)}
+  body.dark .btn-primary,body.dark .btn-dice{box-shadow:0 0 14px rgba(168,85,247,.45)}
+  body.dark .btn-json{box-shadow:0 0 12px rgba(78,156,104,.4)}
+  body.dark .pawn{filter:drop-shadow(0 0 6px rgba(196,165,245,.8))}
+
+  /* = capture = */
+  .capture-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:560px){.capture-grid{grid-template-columns:1fr}}
+  .dropzone{border:3px dashed var(--wood);border-radius:16px;padding:26px 14px;text-align:center;cursor:pointer;transition:background .15s;background:var(--bg)}
+  .dropzone:hover,.dropzone.drag{background:var(--board)}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--wood-dark);color:#fff;padding:10px 18px;border-radius:99px;font-size:.9rem;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9;font-weight:700}
+  .dropzone .big{font-size:1.9rem}
+  .dropzone p{font-size:.9rem;color:var(--muted);margin-top:6px}
+  .btn-dice{margin-top:10px;display:inline-block;background:var(--accent);color:#fff;border:none;border-bottom:4px solid var(--accent-dark);border-radius:12px;padding:10px 18px;font-size:.95rem;font-weight:800;cursor:pointer}
+  .btn-dice:active{border-bottom-width:1px;transform:translateY(3px)}
+  #receiptPreview img,#receiptPreview .ph-img{width:100%;max-height:180px;object-fit:cover;border-radius:12px;border:2px solid var(--wood);display:block}
+  .ph-img{background:repeating-linear-gradient(45deg,var(--board),var(--board) 10px,var(--line) 10px,var(--line) 20px);height:160px;position:relative}
+  .ph-img span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.85rem}
+  .extract-card{margin-top:16px;border:2px solid var(--wood);border-radius:14px;padding:16px;background:#fffdf7}
+  .extract-card .row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;align-items:center}
+  .extract-card .row .k{color:var(--muted)}
+  .extract-card .row .v{font-weight:600;text-align:right}
+  .amt{font-size:1.5rem;font-weight:800;color:var(--accent)}
+  .extract-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .btn{border:none;border-radius:12px;padding:11px 16px;font-weight:800;font-size:.95rem;cursor:pointer}
+  .btn-primary{background:var(--accent);color:#fff;border-bottom:3px solid var(--accent-dark)}
+  .btn-primary:active{border-bottom-width:1px;transform:translateY(2px)}
+  .btn-ghost{background:transparent;border:2px solid var(--line);color:var(--ink)}
+  .note-input,select.cat{border:2px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;background:var(--bg);color:var(--ink)}
+  .note-input{width:100%;margin-top:10px}
+  .toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-size:.9rem;opacity:0;transition:opacity .25s;pointer-events:none;z-index:9}
+  .toast.show{opacity:1}
+  .theme-btn{background:var(--card);border:2px solid var(--wood);color:var(--ink);border-radius:99px;padding:6px 14px;font:inherit;font-size:.85rem;font-weight:700;cursor:pointer}
+  .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+  /* item rows */
+  .items-label{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .items-label .label{margin:8px 0 6px}
+  .item-head{display:grid;grid-template-columns:1fr 52px 86px auto;gap:6px;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-bottom:4px}
+  .item-head span:nth-child(2){text-align:center}
+  .item-head span:nth-child(3){text-align:right}
+  .item-row{display:grid;grid-template-columns:1fr 52px 86px auto;gap:6px;margin-bottom:6px}
+  .item-row input{border:2px solid var(--line);border-radius:9px;padding:7px 9px;font:inherit;font-size:.9rem;background:var(--bg);color:var(--ink);min-width:0}
+  @media(max-width:560px){.item-row,.item-head{grid-template-columns:1fr 46px 78px auto}}
+
+  /* = board = */
+  .board{position:relative;background:var(--board);border:3px solid var(--wood);border-radius:16px;padding:18px 12px 12px;margin-bottom:16px}
+  .path{display:flex;justify-content:space-between;position:relative;gap:4px}
+  .path::before{content:"";position:absolute;left:20px;right:20px;top:24px;border-top:3px dashed var(--wood)}
+  .sq{position:relative;z-index:1;text-align:center;flex:1;min-width:0}
+  .sq .dot{width:42px;height:42px;max-width:100%;margin:0 auto;background:var(--card);border:3px solid var(--wood);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;position:relative}
+  .sq.done .dot{background:var(--green);border-color:var(--green);color:#fff}
+  .sq.now .dot{background:var(--card);border-color:var(--accent);color:var(--accent);box-shadow:0 0 0 4px rgba(228,87,46,.25)}
+  .sq .d{font-size:.62rem;font-weight:700;color:var(--muted);margin-top:4px;white-space:nowrap}
+  .pawn{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:1.15rem}
+  .board-caption{display:flex;justify-content:space-between;align-items:center;margin:-6px 4px 0;font-size:.78rem;color:var(--muted);font-weight:700}
+  .board-caption .days{color:var(--green)}
+
+  /* = log = */
+  .month-title{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  .month-total{font-weight:800;color:var(--accent)}
+  ul.log{list-style:none}
+  .entry{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .entry:last-child{border-bottom:none}
+  .entry .date{min-width:64px;color:var(--muted);font-size:.85rem}
+  .entry .cat-chip{background:var(--board);border:1px solid var(--wood);color:var(--wood-dark);border-radius:99px;padding:3px 10px;font-size:.78rem;font-weight:700;white-space:nowrap}
+  .entry .desc{flex:1;min-width:160px}
+  .entry .desc .note{color:var(--muted);font-size:.85rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .entry .amt-e{font-weight:800;white-space:nowrap}
+  .entry .actions{display:flex;gap:6px}
+  .icon-btn{background:var(--card);border:2px solid var(--line);border-radius:9px;padding:5px 10px;font-size:.8rem;font-weight:700;cursor:pointer;color:var(--ink)}
+  .icon-btn.del{color:var(--danger);border-color:var(--danger)}
+  .items-detail{flex-basis:100%;background:var(--board);border-radius:10px;padding:10px 12px;font-size:.87rem;clear:both}
+  .items-detail-row{display:flex;gap:10px;padding:3px 0;border-bottom:1px dashed var(--wood)}
+  .items-detail-row:last-of-type{border-bottom:none}
+  .items-detail-row .n{flex:1}
+  .items-detail-row .q{color:var(--muted);min-width:30px}
+  .items-detail-row .p{font-weight:700;white-space:nowrap}
+  .items-detail-total{text-align:right;font-weight:800;padding-top:6px;color:var(--accent)}
+  .edit-row{background:var(--board);border-radius:10px;padding:10px;margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;flex-basis:100%}
+  .edit-row input,.edit-row select{border:2px solid var(--line);border-radius:9px;padding:7px 9px;font:inherit;background:var(--bg);color:var(--ink)}
+  .btn-ok{background:var(--green);color:#fff;border-bottom:3px solid #2c5c39}
+  .empty-log{color:var(--muted);text-align:center;padding:20px}
+
+  /* = export = */
+  .export-grid{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end}
+  @media(max-width:560px){.export-grid{grid-template-columns:1fr 1fr}.export-grid .btn-primary{grid-column:1/-1}}
+  fieldset{border:none}
+  .export-preview{margin-top:16px;border-top:2px dashed var(--wood);padding-top:14px}
+  .export-count{font-size:.95rem;margin-bottom:10px}
+  .export-count strong{color:var(--accent)}
+  table.xp{width:100%;border-collapse:collapse;font-size:.88rem}
+  table.xp th{text-align:left;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;padding:6px 8px;border-bottom:2px solid var(--wood)}
+  table.xp td{padding:7px 8px;border-bottom:1px solid var(--line)}
+  .xp-actions{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .btn-json{background:var(--green);color:#fff;border-bottom:3px solid #2c5c39}
+  .reset-link{color:var(--muted);font-size:.8rem;background:none;text-decoration:underline;cursor:pointer}
+  .reset-link:hover{color:var(--danger)}
+  .foot{color:var(--muted);font-size:.8rem;text-align:center;margin-top:26px}
+
+  /* bottom tab bar */
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:8;display:flex;background:rgba(28,23,18,.94);backdrop-filter:blur(8px);border-top:3px solid var(--wood);padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+  .tabbar button{flex:1;background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;font:inherit;font-size:.72rem;font-weight:800;color:var(--muted);border-radius:12px;padding:6px 4px;cursor:pointer}
+  .tabbar button .ic{font-size:1.3rem;line-height:1}
+  .tabbar button.active{color:var(--accent)}
+  @media(min-width:700px){.tabbar{max-width:560px;left:50%;transform:translateX(-50%);bottom:14px;border:3px solid var(--wood);border-radius:18px;box-shadow:0 4px 14px rgba(58,50,38,.15)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+      <div>
+        <h1>Receipt to Expense Log</h1>
+        <p>The month is a game board — every receipt you log moves your pawn forward. 🎲</p>
+      </div>
+      <button class="theme-btn" id="themeBtn" type="button" title="Toggle dark mode">🌙 Dark</button>
+    </div>
+  </header>
+
+  <!-- 1. RECEIPT CAPTURE -->
+  <section id="sec-capture">
+    <div class="sec-head"><span class="sec-num">1</span><h2>Roll for receipts</h2></div>
+    <p class="hint">Snap or upload a receipt image. The app reads the items and totals them for you to review.</p>
+    <div class="capture-grid">
+      <div>
+        <div class="label">Your turn</div>
+        <div class="dropzone" id="dropzone">
+          <div class="big">🎲</div>
+          <p>Roll the dice — snap or upload a receipt</p>
+          <button class="btn-dice" id="pickBtn" type="button">🎲 Roll — log a receipt</button>
+        </div>
+        <input type="file" id="fileInput" accept="image/*" capture="environment" hidden>
+      </div>
+      <div>
+        <div class="label">Latest receipt</div>
+        <div id="receiptPreview"><div class="ph-img"><span>No receipt captured yet</span></div></div>
+      </div>
+    </div>
+    <div class="extract-card" id="extractCard" hidden>
+      <div class="row"><span class="k">Merchant</span><span class="v" id="xMerchant">—</span></div>
+      <div class="row"><span class="k">Total (from items)</span><span class="v amt" id="xAmount">—</span></div>
+      <div class="row"><span class="k">Guessed category</span>
+        <span class="v"><select class="cat" id="xCat"></select></span></div>
+      <div class="row"><span class="k">Date</span><span class="v" id="xDate">—</span></div>
+      <div class="items-label">
+        <span class="label" style="margin:8px 0 6px">Items read</span>
+        <button class="icon-btn" id="addItemBtn" type="button" hidden>+ Add item</button>
+      </div>
+      <div class="item-head"><span>Item</span><span>Qty</span><span>Price RM</span><span></span></div>
+      <div id="xItems"></div>
+      <input class="note-input" id="xNote" placeholder="Add an optional note (e.g. team lunch)">
+      <div class="extract-actions">
+        <button class="btn btn-ok" id="confirmBtn" type="button">✓ Move your pawn — add to log</button>
+        <button class="btn btn-ghost" id="discardBtn" type="button">Discard</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. MONTHLY EXPENSE LOG -->
+  <section id="sec-log">
+    <div class="sec-head"><span class="sec-num">2</span><h2>Month board</h2></div>
+    <p class="hint">Your pawn advances every day you log a receipt. Confirm, edit, or remove entries below.</p>
+    <div class="board">
+      <div class="path" id="boardPath"></div>
+    </div>
+    <div class="board-caption">
+      <span id="boardStats">—</span>
+      <span class="days" id="boardDays"></span>
+    </div>
+    <div class="month-title" style="margin-top:14px">
+      <strong id="monthLabel">—</strong>
+      <span class="month-total" id="monthTotal"></span>
+    </div>
+    <ul class="log" id="logList"></ul>
+  </section>
+
+  <!-- 3. EXPORT REPORT -->
+  <section id="sec-export">
+    <div class="sec-head"><span class="sec-num">3</span><h2>Export the score sheet</h2></div>
+    <p class="hint">Pick a start and end date, check the matching entries, then export.</p>
+    <div class="export-grid">
+      <div><div class="label">Start date</div><input type="date" id="startDate" class="note-input" style="margin-top:0"></div>
+      <div><div class="label">End date</div><input type="date" id="endDate" class="note-input" style="margin-top:0"></div>
+      <button class="btn btn-primary" id="applyRangeBtn" type="button">Show range</button>
+    </div>
+    <div class="export-preview" id="exportPreview" hidden>
+      <div class="export-count" id="exportCount"></div>
+      <table class="xp">
+        <thead><tr><th>Date</th><th>Category</th><th>Note</th><th style="text-align:right">Amount (RM)</th></tr></thead>
+        <tbody id="exportBody"></tbody>
+      </table>
+      <div class="xp-actions">
+        <button class="btn btn-primary" id="csvBtn" type="button">⬇ Export CSV</button>
+        <button class="btn btn-json" id="jsonBtn" type="button">⬇ Export JSON</button>
+        <button class="btn btn-ghost" id="copyBtn" type="button">Copy as text</button>
+      </div>
+    </div>
+  </section>
+
+  <p class="foot">Demo app — sample data only. Your log is saved privately on this device. <button class="reset-link" id="resetBtn" type="button">Reset to sample data</button></p>
+</div>
+<nav class="tabbar" aria-label="Section navigation">
+  <button data-target="sec-capture" type="button"><span class="ic">🎲</span>Roll</button>
+  <button data-target="sec-log" type="button"><span class="ic">♟️</span>Board</button>
+  <button data-target="sec-export" type="button"><span class="ic">📜</span>Score</button>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+  var CATEGORIES = ["Food & Drinks","Groceries","Transport","Utilities","Shopping","Health","Other"];
+  var NOW = new Date();
+  function iso(d){ return d.toISOString().slice(0,10); }
+  function rm(n){ return "RM " + n.toFixed(2); }
+  function todayOffset(days){ var d=new Date(NOW); d.setDate(d.getDate()+days); return iso(d); }
+
+  // --- state (persisted as JSON in localStorage on this device) ---
+  var STORE_KEY = "r2e.entries.v1";
+  function sampleEntries(){
+    return [
+      { id:1, date: todayOffset(-1),  category:"Food & Drinks", amount:18.50, note:"Nasi lemak + teh tarik at Village Park" },
+      { id:2, date: todayOffset(-4),  category:"Groceries",     amount:74.30, note:"Weekly groceries at Lotus's Mutiara Damansara" },
+      { id:3, date: todayOffset(-9),  category:"Transport",     amount:32.00, note:"Grab rides to KL Sentral" }
+    ];
+  }
+  function loadEntries(){
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw){
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.every(function(e){ return e && typeof e.amount === "number" && typeof e.date === "string"; })){
+          return parsed;
+        }
+      }
+    } catch(err){ /* corrupt or unavailable storage — fall back to samples */ }
+    return sampleEntries();
+  }
+  function saveEntries(){
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(entries)); }
+    catch(err){ toast("Could not save — storage unavailable"); }
+  }
+  var entries = loadEntries();
+  var nextId = entries.reduce(function(m,e){ return Math.max(m, e.id||0); }, 0) + 1;
+  var pending = null;
+  var rangeEntries = [];
+
+  var toastEl = document.getElementById("toast"), toastTimer;
+  function toast(msg){
+    toastEl.textContent = msg; toastEl.classList.add("show");
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ toastEl.classList.remove("show"); }, 2200);
+  }
+  function monthLabel(dstr){ return new Date(dstr + "T00:00:00").toLocaleDateString("en-MY",{month:"long",year:"numeric"}); }
+  function prettyDate(dstr){ return new Date(dstr+"T00:00:00").toLocaleDateString("en-MY",{day:"numeric",month:"short"}); }
+  function thisMonth(dstr){ return dstr.slice(0,7) === iso(NOW).slice(0,7); }
+
+  var xCat = document.getElementById("xCat");
+  CATEGORIES.forEach(function(c){ var o=document.createElement("option"); o.value=o.textContent=c; xCat.appendChild(o); });
+
+  // --- Section 2: month board ---
+  var CAT_ICONS = {
+    "Food & Drinks":"🍛", "Groceries":"🛒", "Transport":"🚕", "Utilities":"💡",
+    "Shopping":"🛍️", "Health":"💊", "Other":"📦"
+  };
+  function catIcon(cat){ return CAT_ICONS[cat] || "📦"; }
+  function renderBoard(){
+    var path = document.getElementById("boardPath");
+    var days = {}; // date -> primary category icon
+    entries.forEach(function(e){
+      if (thisMonth(e.date)){
+        var cur = days[e.date];
+        if (!cur || e.amount > (cur.amt||0)) days[e.date] = { icon: catIcon(e.category), amt: e.amount };
+      }
+    });
+    var t = new Date(NOW);
+    var dom = t.getDate();
+    var dim = new Date(t.getFullYear(), t.getMonth()+1, 0).getDate();
+    var start = Math.max(1, dom - 2);
+    var end = Math.min(dim, dom + 3);
+    path.innerHTML = "";
+    for (var d = start; d <= end; d++){
+      var ds = iso(new Date(t.getFullYear(), t.getMonth(), d));
+      var sq = document.createElement("div");
+      sq.className = "sq";
+      var dot = document.createElement("div");
+      dot.className = "dot";
+      var has = !!days[ds];
+      if (has){ sq.classList.add("done"); dot.textContent = days[ds].icon; }
+      else if (d === dom){ sq.classList.add("now"); dot.textContent = "?"; }
+      else if (d < dom){ dot.textContent = "·"; }
+      else { dot.textContent = "?"; }
+      if (d === dom){
+        var pawn = document.createElement("span");
+        pawn.className = "pawn"; pawn.textContent = "♟️";
+        dot.appendChild(pawn);
+      }
+      sq.appendChild(dot);
+      var lab = document.createElement("div");
+      lab.className = "d";
+      lab.textContent = new Date(t.getFullYear(), t.getMonth(), d).toLocaleDateString("en-MY",{weekday:"short"}) + " " + d;
+      sq.appendChild(lab);
+      path.appendChild(sq);
+    }
+    var logged = Object.keys(days).length;
+    document.getElementById("boardStats").textContent = "🎲 " + entries.filter(function(e){ return thisMonth(e.date); }).length + " receipts logged this month";
+    document.getElementById("boardDays").textContent = logged + " / " + dom + " days advanced";
+  }
+
+  // --- Section 2: log list ---
+  var logList = document.getElementById("logList");
+  function renderLog(){
+    renderBoard();
+    var monthEntries = entries.filter(function(e){ return thisMonth(e.date); })
+                               .sort(function(a,b){ return b.date.localeCompare(a.date) || b.id-a.id; });
+    document.getElementById("monthLabel").textContent = "Entries for " + monthLabel(iso(NOW));
+    var total = monthEntries.reduce(function(s,e){ return s + e.amount; },0);
+    document.getElementById("monthTotal").textContent = "Total: " + rm(total);
+    logList.innerHTML = "";
+    if (!monthEntries.length){
+      logList.innerHTML = '<li class="empty-log">No entries for this month yet — roll the dice above.</li>';
+      return;
+    }
+    monthEntries.forEach(function(e){
+      var li = document.createElement("li");
+      li.className = "entry";
+      li.innerHTML =
+        '<span class="date">'+prettyDate(e.date)+'</span>' +
+        '<span class="cat-chip"></span>' +
+        '<span class="desc"><strong></strong><div class="note"></div></span>' +
+        '<span class="amt-e"></span>' +
+        '<span class="actions">' +
+          '<button class="icon-btn edit" type="button">Edit</button>' +
+          '<button class="icon-btn del" type="button">Remove</button>' +
+        '</span>';
+      li.querySelector(".cat-chip").textContent = catIcon(e.category) + " " + e.category;
+      li.querySelector(".desc strong").textContent = e.merchant || "Receipt";
+      var noteEl = li.querySelector(".note");
+      var itemsTxt = (e.items && e.items.length) ? e.items.length + " item" + (e.items.length>1?"s":"") : "";
+      noteEl.textContent = (e.note || "") + (itemsTxt ? (e.note ? " · " : "") + itemsTxt : "");
+      if (e.items && e.items.length){
+        li.querySelector(".desc").style.cursor = "pointer";
+        li.querySelector(".desc").title = "Click to view items";
+        li.querySelector(".desc").addEventListener("click", function(){ toggleItemDetail(li, e); });
+      }
+      li.querySelector(".amt-e").textContent = rm(e.amount);
+      li.querySelector(".edit").addEventListener("click", function(){ editEntry(li, e); });
+      li.querySelector(".del").addEventListener("click", function(){
+        entries = entries.filter(function(x){ return x.id !== e.id; });
+        saveEntries(); renderLog(); renderExportPreview();
+        toast("Entry removed — pawn steps back");
+      });
+      logList.appendChild(li);
+    });
+  }
+  function toggleItemDetail(li, e){
+    var existing = li.querySelector(".items-detail");
+    if (existing){ existing.remove(); return; }
+    var box = document.createElement("div");
+    box.className = "items-detail";
+    e.items.forEach(function(it){
+      var row = document.createElement("div");
+      row.className = "items-detail-row";
+      row.innerHTML = "<span class='n'></span><span class='q'></span><span class='p'></span>";
+      row.querySelector(".n").textContent = it.name || "(unnamed)";
+      row.querySelector(".q").textContent = "×" + it.qty;
+      row.querySelector(".p").textContent = rm(it.qty * it.price);
+      box.appendChild(row);
+    });
+    var t = document.createElement("div");
+    t.className = "items-detail-total";
+    t.textContent = "Total " + rm(e.amount);
+    box.appendChild(t);
+    li.appendChild(box);
+  }
+  function editEntry(li, e){
+    if (li.querySelector(".edit-row")) return;
+    var row = document.createElement("div");
+    row.className = "edit-row";
+    row.innerHTML =
+      '<input type="date" value="'+e.date+'">' +
+      '<input type="number" step="0.01" min="0" value="'+e.amount.toFixed(2)+'" style="width:100px">' +
+      '<select class="cat"></select>' +
+      '<input placeholder="Note" value="'+(e.note||"").replace(/"/g,"&quot;")+'" style="flex:1;min-width:120px">' +
+      '<button class="btn btn-ok" type="button">Save</button>';
+    var sel = row.querySelector("select.cat");
+    CATEGORIES.forEach(function(c){ var o=document.createElement("option"); o.value=o.textContent=c; sel.appendChild(o); });
+    sel.value = e.category;
+    row.querySelector(".btn-ok").addEventListener("click", function(){
+      var d = row.children[0].value, a = parseFloat(row.children[1].value);
+      if (!d || isNaN(a) || a <= 0){ toast("Enter a valid date and amount"); return; }
+      e.date = d; e.amount = a; e.category = sel.value; e.note = row.children[3].value.trim();
+      saveEntries(); renderLog(); renderExportPreview();
+      toast("Entry updated");
+    });
+    li.appendChild(row);
+  }
+
+  // --- Section 1: capture & simulated item extraction ---
+  var dropzone = document.getElementById("dropzone");
+  var fileInput = document.getElementById("fileInput");
+  document.getElementById("pickBtn").addEventListener("click", function(ev){ ev.stopPropagation(); fileInput.click(); });
+  dropzone.addEventListener("click", function(){ fileInput.click(); });
+  ["dragover","dragenter"].forEach(function(ev){ dropzone.addEventListener(ev, function(e){ e.preventDefault(); dropzone.classList.add("drag"); }); });
+  ["dragleave","drop"].forEach(function(ev){ dropzone.addEventListener(ev, function(e){ e.preventDefault(); dropzone.classList.remove("drag"); }); });
+  dropzone.addEventListener("drop", function(e){ if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener("change", function(){ if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+  var SAMPLE_RECEIPTS = [
+    { merchant:"Nasi Kandar Pelita", category:"Food & Drinks",
+      items:[ {name:"Nasi kandar ayam ros", qty:1, price:12.50}, {name:"Teh tarik", qty:2, price:3.20}, {name:"Roti telur", qty:1, price:3.50} ] },
+    { merchant:"7-Eleven Bukit Bintang", category:"Shopping",
+      items:[ {name:"Milo can 240ml", qty:2, price:3.80}, {name:"Maggi cup", qty:1, price:4.85} ] },
+    { merchant:"Petronas Station", category:"Transport",
+      items:[ {name:"RON95 petrol", qty:1, price:60.00}, {name:"Windshield washer", qty:1, price:12.00} ] },
+    { merchant:"MR. DIY", category:"Shopping",
+      items:[ {name:"LED bulb 9W", qty:2, price:9.90}, {name:"Storage box 5L", qty:1, price:8.50}, {name:"Bubble wrap", qty:1, price:7.90} ] },
+    { merchant:"Lotus's Mutiara Damansara", category:"Groceries",
+      items:[ {name:"Beras cap ria 5kg", qty:1, price:22.90}, {name:"Telur gred A 30pcs", qty:1, price:15.50}, {name:"Ayam segar 1.2kg", qty:1, price:18.60}, {name:"Susu full cream 1L", qty:2, price:7.49} ] },
+    { merchant:"Guardian Pharmacy", category:"Health",
+      items:[ {name:"Paracetamol 500mg", qty:1, price:8.20}, {name:"Vitamin C 1000mg", qty:1, price:25.90}, {name:"Plaster strips", qty:2, price:5.00} ] },
+    { merchant:"Restoran Kayu Mamak", category:"Food & Drinks",
+      items:[ {name:"Roti canai", qty:3, price:2.50}, {name:"Maggi goreng", qty:1, price:8.00}, {name:"Teh o ais", qty:1, price:2.80} ] }
+  ];
+  function handleFile(file){
+    if (!file.type || file.type.indexOf("image") !== 0){ toast("Please choose an image file"); return; }
+    var url = URL.createObjectURL(file);
+    document.getElementById("receiptPreview").innerHTML = '<img src="'+url+'" alt="Captured receipt">';
+    var pick = SAMPLE_RECEIPTS[Math.floor(Math.random()*SAMPLE_RECEIPTS.length)];
+    var items = pick.items.map(function(it){
+      var p = Math.round(it.price * (0.92 + Math.random()*0.16) * 100) / 100;
+      return { name: it.name, qty: it.qty, price: p };
+    });
+    pending = { date: iso(NOW), merchant: pick.merchant, category: pick.category, items: items, note: "" };
+    document.getElementById("xMerchant").textContent = pick.merchant;
+    xCat.value = pick.category;
+    document.getElementById("xDate").textContent = prettyDate(pending.date) + " " + new Date().toLocaleTimeString("en-MY",{hour:"2-digit",minute:"2-digit"});
+    document.getElementById("xNote").value = "";
+    renderPendingItems();
+    document.getElementById("extractCard").hidden = false;
+    document.getElementById("extractCard").scrollIntoView({behavior:"smooth", block:"nearest"});
+    toast("You rolled: " + pick.merchant);
+  }
+  function pendingTotal(){
+    return pending ? pending.items.reduce(function(s,it){ return s + it.qty * it.price; }, 0) : 0;
+  }
+  function renderPendingItems(){
+    var list = document.getElementById("xItems");
+    list.innerHTML = "";
+    if (pending) pending.items.forEach(function(it, idx){
+      var row = document.createElement("div");
+      row.className = "item-row";
+      row.innerHTML =
+        '<input class="it-name" placeholder="Item" value="'+it.name.replace(/"/g,"&quot;")+'">' +
+        '<input class="it-qty" type="number" min="1" step="1" value="'+it.qty+'">' +
+        '<input class="it-price" type="number" min="0" step="0.01" value="'+it.price.toFixed(2)+'">' +
+        '<button class="icon-btn del" type="button" aria-label="Remove item">✕</button>';
+      row.querySelector(".it-qty").addEventListener("input", function(){
+        it.qty = Math.max(1, parseInt(this.value,10)||1); updPendingTotal();
+      });
+      row.querySelector(".it-price").addEventListener("input", function(){
+        it.price = Math.max(0, parseFloat(this.value)||0); updPendingTotal();
+      });
+      row.querySelector(".it-name").addEventListener("input", function(){ it.name = this.value; });
+      row.querySelector(".del").addEventListener("click", function(){
+        pending.items.splice(idx,1); renderPendingItems();
+      });
+      list.appendChild(row);
+    });
+    document.getElementById("addItemBtn").hidden = !pending;
+    updPendingTotal();
+  }
+  function updPendingTotal(){
+    document.getElementById("xAmount").textContent = rm(pendingTotal());
+  }
+  document.getElementById("addItemBtn").addEventListener("click", function(){
+    if (!pending) return;
+    pending.items.push({ name:"", qty:1, price:0 });
+    renderPendingItems();
+    var names = document.querySelectorAll("#xItems .it-name");
+    if (names.length) names[names.length-1].focus();
+  });
+  xCat.addEventListener("change", function(){ if (pending) pending.category = xCat.value; });
+  document.getElementById("xNote").addEventListener("input", function(){ if (pending) pending.note = this.value; });
+  document.getElementById("discardBtn").addEventListener("click", function(){
+    pending = null;
+    document.getElementById("extractCard").hidden = true;
+    document.getElementById("receiptPreview").innerHTML = '<div class="ph-img"><span>No receipt captured yet</span></div>';
+    fileInput.value = "";
+  });
+  document.getElementById("confirmBtn").addEventListener("click", function(){
+    if (!pending) return;
+    var items = pending.items.filter(function(it){ return it.name.trim() || it.price > 0; });
+    var total = Math.round(items.reduce(function(s,it){ return s + it.qty * it.price; }, 0) * 100) / 100;
+    entries.push({
+      id: nextId++, date: pending.date, category: pending.category, amount: total,
+      note: pending.note || "Receipt at " + pending.merchant,
+      merchant: pending.merchant, items: items
+    });
+    saveEntries();
+    pending = null;
+    document.getElementById("extractCard").hidden = true;
+    document.getElementById("receiptPreview").innerHTML = '<div class="ph-img"><span>No receipt captured yet</span></div>';
+    fileInput.value = "";
+    renderLog();
+    document.getElementById("sec-log").scrollIntoView({behavior:"smooth", block:"start"});
+    toast("Pawn moved! Entry added to the board ✓");
+  });
+
+  // --- Section 3: export ---
+  var startDate = document.getElementById("startDate");
+  var endDate = document.getElementById("endDate");
+  startDate.value = todayOffset(-30);
+  endDate.value = iso(NOW);
+  var exportPreview = document.getElementById("exportPreview");
+  document.getElementById("applyRangeBtn").addEventListener("click", function(){
+    if (!startDate.value || !endDate.value){ toast("Pick both a start and end date"); return; }
+    if (startDate.value > endDate.value){ toast("Start date must be before end date"); return; }
+    rangeEntries = entries.filter(function(e){ return e.date >= startDate.value && e.date <= endDate.value; })
+                          .sort(function(a,b){ return a.date.localeCompare(b.date); });
+    renderExportPreview();
+  });
+  function renderExportPreview(){
+    var total = rangeEntries.reduce(function(s,e){ return s + e.amount; },0);
+    document.getElementById("exportCount").innerHTML =
+      "<strong>" + rangeEntries.length + "</strong> " + (rangeEntries.length===1?"entry matches":"entries match") +
+      " " + startDate.value + " to " + endDate.value + " — total " + rm(total);
+    var tb = document.getElementById("exportBody");
+    tb.innerHTML = "";
+    rangeEntries.forEach(function(e){
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td></td><td></td><td></td><td style='text-align:right'></td>";
+      tr.children[0].textContent = e.date;
+      tr.children[1].textContent = e.category;
+      tr.children[2].textContent = e.note || "";
+      tr.children[3].textContent = e.amount.toFixed(2);
+      tb.appendChild(tr);
+    });
+    exportPreview.hidden = false;
+  }
+  function csvString(){
+    var lines = ["Date,Category,Note,Items,Amount (RM)"];
+    rangeEntries.forEach(function(e){
+      var note = (e.note||"").replace(/"/g,'""');
+      var items = (e.items||[]).map(function(it){ return it.qty + "x " + it.name + " @" + it.price.toFixed(2); }).join("; ").replace(/"/g,'""');
+      lines.push(e.date + ',"' + e.category + '","' + note + '","' + items + '",' + e.amount.toFixed(2));
+    });
+    return lines.join("\n");
+  }
+  function jsonExport(){
+    return JSON.stringify({
+      app: "Receipt to Expense Log",
+      range: { start: startDate.value, end: endDate.value },
+      total: Math.round(rangeEntries.reduce(function(s,e){ return s + e.amount; },0) * 100) / 100,
+      count: rangeEntries.length,
+      entries: rangeEntries.map(function(e){
+        return {
+          date: e.date, category: e.category, note: e.note || "", amount: e.amount,
+          merchant: e.merchant || "",
+          items: (e.items||[]).map(function(it){
+            return { name: it.name, qty: it.qty, price: it.price, lineTotal: Math.round(it.qty*it.price*100)/100 };
+          })
+        };
+      })
+    }, null, 2);
+  }
+  function triggerDownload(content, mime, filename){
+    var blob = new Blob([content], {type: mime});
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  document.getElementById("csvBtn").addEventListener("click", function(){
+    if (!rangeEntries.length){ toast("Nothing to export in this range"); return; }
+    triggerDownload(csvString(), "text/csv", "expense-log_" + startDate.value + "_to_" + endDate.value + ".csv");
+    toast("CSV downloaded — also shown on screen above");
+  });
+  document.getElementById("jsonBtn").addEventListener("click", function(){
+    if (!rangeEntries.length){ toast("Nothing to export in this range"); return; }
+    triggerDownload(jsonExport(), "application/json", "expense-log_" + startDate.value + "_to_" + endDate.value + ".json");
+    toast("JSON downloaded — also shown on screen above");
+  });
+  document.getElementById("copyBtn").addEventListener("click", function(){
+    if (!rangeEntries.length){ toast("Nothing to export in this range"); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(csvString()).then(function(){ toast("Copied to clipboard"); }, function(){ toast("Copy failed — use CSV export"); });
+    } else { toast("Clipboard not available — use CSV export"); }
+  });
+
+  // keep export preview in sync after log changes
+  var origRenderLog = renderLog;
+  renderLog = function(){ origRenderLog(); if (!exportPreview.hidden && startDate.value && endDate.value){
+    rangeEntries = entries.filter(function(e){ return e.date >= startDate.value && e.date <= endDate.value; })
+                          .sort(function(a,b){ return a.date.localeCompare(b.date); });
+    renderExportPreview();
+  }};
+
+  // reset
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    entries = sampleEntries(); saveEntries(); renderLog();
+    exportPreview.hidden = true;
+    toast("Reset to sample data");
+  });
+
+  // --- tab bar ---
+  var tabButtons = Array.prototype.slice.call(document.querySelectorAll(".tabbar button"));
+  tabButtons.forEach(function(btn){
+    btn.addEventListener("click", function(){
+      var target = document.getElementById(btn.dataset.target);
+      var offset = window.innerWidth >= 700 ? 20 : 70;
+      window.scrollTo({ top: target.getBoundingClientRect().top + window.pageYOffset - offset, behavior: "smooth" });
+    });
+  });
+  if ("IntersectionObserver" in window){
+    var current = "sec-capture";
+    var io = new IntersectionObserver(function(obs){
+      obs.forEach(function(o){ if (o.isIntersecting) current = o.target.id; });
+      tabButtons.forEach(function(b){ b.classList.toggle("active", b.dataset.target === current); });
+    }, { rootMargin: "-30% 0px -55% 0px" });
+    ["sec-capture","sec-log","sec-export"].forEach(function(id){ io.observe(document.getElementById(id)); });
+  } else {
+    tabButtons[0].classList.add("active");
+  }
+
+  // --- dark mode toggle (persisted) ---
+  var THEME_KEY = "r2e.theme.v1";
+  var themeBtn = document.getElementById("themeBtn");
+  function applyTheme(t){
+    document.body.classList.toggle("dark", t === "dark");
+    themeBtn.textContent = t === "dark" ? "☀️ Light" : "🌙 Dark";
+  }
+  var savedTheme = "light";
+  try { savedTheme = localStorage.getItem(THEME_KEY) || "light"; } catch(err){}
+  applyTheme(savedTheme);
+  themeBtn.addEventListener("click", function(){
+    savedTheme = savedTheme === "dark" ? "light" : "dark";
+    try { localStorage.setItem(THEME_KEY, savedTheme); } catch(err){}
+    applyTheme(savedTheme);
+  });
+
+  renderLog();
+})();
+</script>
+</body>
+</html>
